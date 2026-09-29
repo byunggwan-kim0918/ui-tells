@@ -364,12 +364,21 @@ run_tailwind() {
     skip "자간·행간 조정(tw)" "code 파일 ${CODE_N}개 — 규모 부족"
   else
     # 절대 임계값은 12개짜리 프로젝트와 400개짜리에서 다른 뜻이 된다. 선언 수 대비 비율로 본다.
-    local typo tuned need
+    #
+    # 조정은 유틸리티 클래스로만 하는 게 아니다. base 스타일(body{letter-spacing})이나
+    # 타입 스케일 토큰(--text-*--line-height)으로 한 번에 처리하면 클래스는 0곳이 된다.
+    # 클래스만 세면 CSS 로 제대로 한 프로젝트일수록 더 크게 틀린 판정을 낸다.
+    local typo tuned need tuned_css
     typo=$(nc 'text-\[[0-9.]+px\]|\btext-(xs|sm|base|lg|xl|[2-9]xl)\b')
     tuned=$(nc 'tracking-\[|leading-\[|\btracking-(tight|tighter|wide)\b')
+    tuned_css=$(ns 'letter-spacing[[:space:]]*:|line-height[[:space:]]*:|--text-[a-z0-9-]+--line-height')
+    tuned=$(( tuned + tuned_css ))
     need=$(( typo / 12 )); [ "$need" -lt 3 ] && need=3
-    [ "$tuned" -lt "$need" ] && hit "자간·행간 미조정(tw)" "${tuned}곳 (타이포 선언 ${typo}곳 대비 최소 ${need} 기대)" \
-                             || ok "자간·행간 조정(tw)" "${tuned}곳"
+    if [ "$tuned" -lt "$need" ]; then
+      hit "자간·행간 미조정" "${tuned}곳 (타이포 선언 ${typo}곳 대비 최소 ${need} 기대)"
+    else
+      ok "자간·행간 조정" "유틸 $(( tuned - tuned_css ))곳 + CSS ${tuned_css}곳"
+    fi
   fi
 
   sect "3. 레이아웃 (tailwind)"
@@ -377,10 +386,17 @@ run_tailwind() {
     skip "섹션 리듬" "code 파일 ${CODE_N}개 — 규모 부족"
     skip "비대칭 분할" "code 파일 ${CODE_N}개 — 규모 부족"
   else
-    # 섹션 리듬만 본다(py-8 이상). 버튼·칩 내부 패딩(py-1~4)은 제외 — 오탐 방지
-    local rh asym
-    rh=$(gc '\bpy-([89]|[1-9][0-9])\b' | sort -u | grep -c . || true)
-    [ "$rh" -le 1 ] && hit "섹션 리듬 없음" "섹션 패딩 종류 ${rh}개" || ok "섹션 리듬" "${rh}종"
+    # 세로 리듬은 py-* 한 갈래로만 만들지 않는다. pt/pb 비대칭, mt/mb 마진,
+    # CSS 의 padding-block·margin-top 도 같은 일을 한다. 한 갈래만 세면
+    # 실제로 8종을 쓰는 화면이 "1종"으로 나온다(실측 오탐 사례).
+    # 버튼·칩 내부 패딩과 구분하려고 6(24px) 이상만 센다.
+    local rh rh_css asym
+    rh=$( { gc '\b(py|pt|pb|mt|mb)-([6-9]|1[0-9]|2[0-9])\b'
+            gc '\b(py|pt|pb|mt|mb)-\[[0-9.]+(px|rem)\]'; } 2>/dev/null | sort -u | grep -c . || true)
+    rh_css=$(gs '(padding|margin)-(block|top|bottom)[[:space:]]*:[[:space:]]*[0-9.]+(px|rem)' \
+             2>/dev/null | sort -u | grep -c . || true)
+    rh=$(( rh + rh_css ))
+    [ "$rh" -le 1 ] && hit "섹션 리듬 없음" "세로 간격 종류 ${rh}개" || ok "섹션 리듬" "${rh}종"
     asym=$(nc 'grid-cols-\[|col-span-[4-9]|grid-cols-[5-9]|grid-cols-1[0-2]')
     [ "$asym" -eq 0 ] && hit "비대칭 분할 없음" "2·3열만 사용" || ok "비대칭 분할" "${asym}곳"
   fi
@@ -389,9 +405,13 @@ run_tailwind() {
   # `dark:` 변형과 `.dark` 클래스 토큰 오버라이드가 **둘 다** 있는데
   # @custom-variant dark 를 선언하지 않았으면, dark:는 OS 설정을 따르고 토큰은 클래스를 따라 어긋난다.
   # custom-variant를 정의한 프로젝트에서는 dark:가 정상이므로 HIT가 아니다.
-  local dv co cv
+  # 다크 구현 방식은 셋이다: Tailwind `dark:` 변형 / `.dark` 클래스 토큰 /
+  # `[data-theme="dark"]` 속성 토큰. 앞의 둘만 찾으면 속성 방식으로 제대로 만든
+  # 프로젝트가 "다크 테마 구현 없음"으로 SKIP 된다(실측 오탐 사례).
+  local dv co at cv
   dv=$(nc 'dark:[a-z-]+')
   co=$(ns '^[[:space:]]*\.dark\b|:root:not\(\[data-theme')
+  at=$(( $(ns '\[data-theme[[:space:]]*=[[:space:]]*.?dark') + $(nc 'data-?[Tt]heme') ))
   cv=$(( $(ns '@custom-variant[[:space:]]+dark') + $(nc '@custom-variant[[:space:]]+dark') ))
   if [ -n "$THEME_STRATEGY" ] && [ "$THEME_STRATEGY" = "custom-variant" ]; then
     ok "테마 전략" "custom-variant 선언됨 — dark: 정상"
@@ -399,6 +419,10 @@ run_tailwind() {
     ok "테마 전략" "@custom-variant dark 감지 — dark: 정상"
   elif [ "$dv" -gt 0 ] && [ "$co" -gt 0 ]; then
     hit "테마 전략 혼용" "dark: ${dv}곳 + .dark 토큰 ${co}곳 (@custom-variant 없이 섞이면 어긋난다)"
+  elif [ "$dv" -gt 0 ] && [ "$at" -gt 0 ]; then
+    hit "테마 전략 혼용" "dark: ${dv}곳 + [data-theme] 토큰 ${at}곳 (한쪽은 OS, 한쪽은 속성을 따라 어긋난다)"
+  elif [ "$at" -gt 0 ]; then
+    ok "테마 전략" "[data-theme] 속성 한 방식만 사용"
   elif [ "$dv" -eq 0 ] && [ "$co" -eq 0 ]; then
     skip "테마 전략" "다크 테마 구현 없음"
   else
@@ -448,7 +472,9 @@ run_locale_ko() {
   sect "2. 타이포 (locale.ko)"
   local num tab
   num=$(nc '[0-9]{1,3},[0-9]{3}|[0-9]+원|[0-9]+박|D-[0-9]|[0-9]+%')
-  tab=$(nc 'tabular-nums|font-variant-numeric')
+  # 전역 base 에서 body{font-variant-numeric:tabular-nums} 한 줄로 끝내는 방식이 있다.
+  # 코드 파일만 세면 그 방식이 "0곳"으로 나온다.
+  tab=$(( $(nc 'tabular-nums|font-variant-numeric') + $(ns 'font-variant-numeric|tabular-nums') ))
   if [ "$num" -le 3 ]; then skip "tabular-nums" "숫자 표기 ${num}곳 — 판정 근거 부족"
   elif [ "$tab" -eq 0 ]; then hit "tabular-nums 없음" "숫자 표기 ${num}곳인데 고정폭 0"
   else ok "tabular-nums" "${tab}곳"; fi

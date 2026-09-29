@@ -2,9 +2,9 @@
 
 **Reads the UI. Finds the tells. Won't fake a pass.**
 
-A design agent for coding assistants. It audits a frontend for the giveaways that say
-*"an AI designed this"*, then runs a full redesign pipeline — reference research, design DNA,
-one committed direction, build, and visual verification.
+A design skill for coding assistants — rules the agent follows, plus two checkers it runs.
+It audits a frontend for the giveaways that say *"an AI designed this"*, then runs a full redesign
+pipeline — reference research, design DNA, one committed direction, build, and visual verification.
 
 The audit half is the part that matters: **it refuses to report a pass on files it could not read.**
 
@@ -47,6 +47,30 @@ color, typography, layout, components, content, motion, plus recurring field fin
 Machine-checkable tells go to `audit.sh`. The rest are judged from screenshots, because
 saturation flatness, missing hierarchy, and "what is this motion for" don't survive a regex.
 
+### Two checkers, different subjects
+
+`audit.sh` reads **code**. `measure.mjs` measures the **rendered page**. Neither installs anything —
+`measure.mjs` drives an already-installed Chrome over CDP using Node's built-in WebSocket, because
+installing a new dependency is a stop-and-ask condition in the pipeline.
+
+```bash
+$ node measure.mjs contrast http://localhost:3000 --theme light,dark
+  검사 24쌍 / 실패 2
+  FAIL  4.48:1 (필요 4.5) 13px/400 rgb(99,113,125) on rgb(244,242,237)  "..."
+```
+
+That failure is the reason it exists: the ink token passed against the page background (4.79:1) and
+failed against the recessed panel background (4.48:1). One token, two grounds — a static checker
+cannot see the second one.
+
+`overflow` is the same idea. It reports the element that **refuses to shrink**, not the wide one:
+
+```
+  뷰포트 390px / 넘침 200px / 원인 후보 3
+  LEAK <div> w=574 right=590  lg:col-span-7
+       → grid/flex 자식의 min-width:auto — 부모에 min-w-0 을 주면 해소될 수 있다
+```
+
 ---
 
 ## Design principles it enforces
@@ -75,6 +99,12 @@ Keying rules to `.tsx` misses entire stacks — so the runner detects how stylin
 
 `css` is where portability actually comes from: stacks without Tailwind put their design decisions
 in `<style>` blocks, and that pack reads them.
+
+**Checks count intent, not one syntax.** Letter-spacing tuned in a base stylesheet, vertical rhythm
+built from `mt-*` instead of `py-*`, `tabular-nums` set once on `body`, dark mode driven by
+`[data-theme]` instead of `dark:` — all of these used to read as "not done" because the check only
+looked for the Tailwind spelling. A check that knows one spelling measures stack preference, not
+quality. `tests/fixtures/css-first/` pins that (L23).
 
 ### Four grades, and `SKIP` is the important one
 
@@ -169,12 +199,14 @@ skills/ui-tells/          ← what gets installed
 ├── typography.md         type selection, scale, CJK handling
 ├── greenfield.md         what §2/§3/§8 become with no existing code
 ├── handoff.md            downstream anchors, fallback ladders, install pitfalls
-├── lessons.md            L1–L20 — the failures each rule came from
-└── audit.sh              the whole checker: preflight, 5 rule sets, dialect detection,
-                          comment stripper, and `--handoff` for downstream seams
+├── lessons.md            L1–L23 — the failures each rule came from
+├── audit.sh              static checker: preflight, 5 rule sets, dialect detection,
+│                         comment stripper, and `--handoff` for downstream seams
+└── measure.mjs           runtime checker: drives real Chrome over CDP, zero deps
+                          contrast · overflow · census · fonts · motion · recon · shot · icon
 
 tests/                    ← repo maintenance, not shipped to users
-├── run-fixtures.sh       22 fixtures: Tailwind · CSS · Vue · Svelte · HTML
+├── run-fixtures.sh       24 fixtures: Tailwind · CSS · Vue · Svelte · HTML · CSS-first
 ├── triggers.md           trigger matrix, dry-run checklist
 └── fixtures/
 ```
@@ -182,7 +214,7 @@ tests/                    ← repo maintenance, not shipped to users
 Run the regression suite:
 
 ```bash
-bash tests/run-fixtures.sh   # PASS 22 / FAIL 0
+bash tests/run-fixtures.sh   # PASS 24 / FAIL 0
 ```
 
 Negative fixtures exist because three false positives were shipped and caught in production use

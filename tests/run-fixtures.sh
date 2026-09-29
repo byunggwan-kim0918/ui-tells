@@ -27,6 +27,17 @@ expect_hit() {
   fi
 }
 
+# $1=라벨 $2=경로 $3=항목명 — 그 항목이 SKIP 이 아니어야 한다.
+# SKIP 은 "검사하지 못함"이므로, 구현이 있는데 못 알아보면 여기서 걸린다.
+expect_ran() {
+  local out; out="$(run "$2")"
+  if printf '%s' "$out" | grep -q $'\033\[33mSKIP'".*$3"; then
+    FAIL=$((FAIL+1)); printf "  \033[31mFAIL\033[0m %-22s SKIP 되면 안 됨: %s\n" "$1" "$3"
+  else
+    PASS=$((PASS+1)); printf "  \033[32mPASS\033[0m %-22s 실행됨: %s\n" "$1" "$3"
+  fi
+}
+
 # $1=라벨 $2=경로 — HIT가 0건이어야 한다
 expect_clean() {
   local out n; out="$(run "$2")"
@@ -52,6 +63,9 @@ expect_exit() {
 echo "== 음성 (오탐 회귀 — 여기가 깨지면 예전 오탐이 되살아난 것) =="
 expect_clean "tailwind/negative" "$D/fixtures/tailwind/negative.tsx"
 expect_clean "css/negative"      "$D/fixtures/css/negative.css"
+# CSS base·@theme 로 처리한 프로젝트를 "유틸리티 미사용"으로 오판하지 않는가 (근거 L23)
+expect_clean "css-first"         "$D/fixtures/css-first"
+expect_ran   "css-first"         "$D/fixtures/css-first" "테마 전략"
 
 echo "== 양성 · Tailwind+React =="
 expect_hit "tailwind/positive" "$D/fixtures/tailwind/positive.tsx" "AI 보라"

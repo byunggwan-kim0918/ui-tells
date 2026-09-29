@@ -1,0 +1,48 @@
+/* 음성 픽스처 — 유틸리티 클래스가 아니라 CSS 로 제대로 한 프로젝트.
+   audit 이 Tailwind 클래스만 세던 시절 여기서 HIT 4건이 오탐으로 났다(L23). */
+@import "tailwindcss";
+
+:root {
+  --paper: #fbfaf7;
+  --ink: #14304a;
+  --fs-body: 0.9375rem;
+}
+
+[data-theme="dark"] {
+  --paper: #12161a;
+  --ink: #dce4ea;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --text-body: var(--fs-body);
+  --text-body--line-height: 1.7;
+  --text-h1: 2rem;
+  --text-h1--line-height: 1.2;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.7;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+.section {
+  padding-block: 2.5rem;
+}
+.section-tight {
+  padding-block: 1.25rem;
+}
+.rail {
+  margin-top: 2rem;
+}
