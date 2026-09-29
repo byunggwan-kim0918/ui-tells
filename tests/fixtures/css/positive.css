@@ -1,0 +1,18 @@
+/* 양성 — 순수 CSS로 표현된 슬롭. Tailwind 클래스가 하나도 없어도 잡혀야 한다.
+   기대 HIT: AI 보라 · 토큰에 Tailwind 기본색 · transition:all · 기본 폰트 · 기본 커브 · hover scale */
+:root {
+  --accent: #6366f1;
+  --muted: #6b7280;
+  --surface: #0f172a;
+  --font-sans: Inter, sans-serif;
+}
+body { font-family: Inter, -apple-system, sans-serif; }
+.cta {
+  background: linear-gradient(135deg, var(--accent), #a855f7);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px var(--accent);
+}
+.cta:hover { transform: scale(1.05); }
+.card:hover { transform: scale(1.08); }
+.tile:hover { transform: scale(1.03); }
+.chip:hover { transform: scale(1.12); }

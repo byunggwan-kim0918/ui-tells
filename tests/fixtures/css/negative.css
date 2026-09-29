@@ -1,0 +1,14 @@
+/* 음성 — 여기서 HIT가 나오면 오탐.
+   주석에 규칙 이름을 적어도 걸리면 안 된다: transition: all, scale(1.05), Inter, #6366f1 */
+:root {
+  --accent: #1c1c1e;
+  --muted: #5f6875;
+  --font-sans: Pretendard, -apple-system, sans-serif;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+body { font-family: var(--font-sans); letter-spacing: -0.01em; line-height: 1.6; }
+.cta {
+  background: var(--accent);
+  transition: background-color 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+.cta:active { transform: translateY(1px); }
